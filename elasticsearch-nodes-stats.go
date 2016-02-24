@@ -102,7 +102,7 @@ func (p ElasticsearchNodesPlugin) GraphDefinition() map[string](mp.Graphs) {
 
 	graphdef["elasticsearch-nodes.ProcessCPUPercent"] = mp.Graphs{
 		Label:   "Elasticsearch nodes Process CPU Percent",
-		Unit:    "integer",
+		Unit:    "percentage",
 		Metrics: metricsProcessCpuPercent,
 	}
 
