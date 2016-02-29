@@ -23,8 +23,13 @@ type ElasticsearchCluster struct {
 
 type ElasticsearchNode struct {
 	Name    string `json:"name"`
+	Os      ElasticsearchNodeOs
 	Process ElasticsearchNodeProcess
 	Jvm     ElasticsearchNodeJvm
+}
+
+type ElasticsearchNodeOs struct {
+	LoadAverage float64 `json:"load_average"`
 }
 
 type ElasticsearchNodeProcess struct {
@@ -64,6 +69,7 @@ func (p *ElasticsearchNodesPlugin) loadStats() error {
 	stats := make(map[string]map[string]float64)
 	for _, node := range cluster.Nodes {
 		nodeStats := make(map[string]float64)
+		nodeStats["os_load_average"] = node.Os.LoadAverage
 		nodeStats["process_cpu_percent"] = node.Process.Cpu.Percent
 		nodeStats["jvm_mem_heap_used_in_bytes"] = node.Jvm.Mem.HeapUsedInBytes
 		stats[node.Name] = nodeStats
@@ -90,14 +96,23 @@ func (p ElasticsearchNodesPlugin) FetchMetrics() (map[string]interface{}, error)
 func (p ElasticsearchNodesPlugin) GraphDefinition() map[string](mp.Graphs) {
 	graphdef := make(map[string](mp.Graphs))
 
+	metricsOsLoadAverage := [](mp.Metrics){}
 	metricsProcessCpuPercent := [](mp.Metrics){}
 	metricsJvmMemHeapUsedInBytes := [](mp.Metrics){}
 
 	for nodeName, _ := range p.Stats {
+		metricsOsLoadAverage = append(metricsOsLoadAverage,
+			mp.Metrics{Name: nodeName + "_os_load_average", Label: nodeName, Diff: false, Type: "uint64"})
 		metricsProcessCpuPercent = append(metricsProcessCpuPercent,
 			mp.Metrics{Name: nodeName + "_process_cpu_percent", Label: nodeName, Diff: false, Type: "uint64"})
 		metricsJvmMemHeapUsedInBytes = append(metricsJvmMemHeapUsedInBytes,
 			mp.Metrics{Name: nodeName + "_jvm_mem_heap_used_in_bytes", Label: nodeName, Diff: false, Type: "uint64"})
+	}
+
+	graphdef["elasticsearch-nodes.OSLoadAverage"] = mp.Graphs{
+		Label:   "Elasticsearch nodes OS Load Average",
+		Unit:    "float",
+		Metrics: metricsOsLoadAverage,
 	}
 
 	graphdef["elasticsearch-nodes.ProcessCPUPercent"] = mp.Graphs{
