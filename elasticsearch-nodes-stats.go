@@ -130,7 +130,7 @@ func main() {
 	if *optTempfile != "" {
 		helper.Tempfile = *optTempfile
 	} else {
-		helper.Tempfile = fmt.Sprintf("/tmp/mackerel-plugin-elasticsearch-nodes-%s-%s", *optHost, *optPort)
+		helper.Tempfile = fmt.Sprintf("/tmp/mackerel-plugin-elasticsearch-nodes-stats-%s-%s", *optHost, *optPort)
 	}
 	helper.Run()
 }
