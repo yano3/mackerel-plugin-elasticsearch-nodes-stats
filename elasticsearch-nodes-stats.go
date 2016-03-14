@@ -26,6 +26,7 @@ type ElasticsearchNode struct {
 	Os      ElasticsearchNodeOs
 	Process ElasticsearchNodeProcess
 	Jvm     ElasticsearchNodeJvm
+	Fs      ElasticsearchNodeFs
 }
 
 type ElasticsearchNodeOs struct {
@@ -48,6 +49,15 @@ type ElasticsearchNodeJvmMem struct {
 	HeapUsedInBytes float64 `json:"heap_used_in_bytes"`
 }
 
+type ElasticsearchNodeFs struct {
+	Total ElasticsearchNodeFsTotal
+}
+
+type ElasticsearchNodeFsTotal struct {
+	TotalInBytes float64 `json:"total_in_bytes"`
+	FreeInBytes  float64 `json:"free_in_bytes"`
+}
+
 func (p *ElasticsearchNodesPlugin) loadStats() error {
 	resp, err := http.Get(p.URI + "/_nodes/stats")
 	if err != nil {
@@ -68,10 +78,15 @@ func (p *ElasticsearchNodesPlugin) loadStats() error {
 
 	stats := make(map[string]map[string]float64)
 	for _, node := range cluster.Nodes {
+		fs_total_in_bytes := node.Fs.Total.TotalInBytes
+		fs_free_in_bytes := node.Fs.Total.FreeInBytes
+		disk_used_in_bytes := fs_total_in_bytes - fs_free_in_bytes
+
 		nodeStats := make(map[string]float64)
 		nodeStats["os_load_average"] = node.Os.LoadAverage
 		nodeStats["process_cpu_percent"] = node.Process.Cpu.Percent
 		nodeStats["jvm_mem_heap_used_in_bytes"] = node.Jvm.Mem.HeapUsedInBytes
+		nodeStats["disk_used_in_bytes"] = disk_used_in_bytes
 		stats[node.Name] = nodeStats
 	}
 	p.Stats = stats
@@ -99,6 +114,7 @@ func (p ElasticsearchNodesPlugin) GraphDefinition() map[string](mp.Graphs) {
 	metricsOsLoadAverage := [](mp.Metrics){}
 	metricsProcessCpuPercent := [](mp.Metrics){}
 	metricsJvmMemHeapUsedInBytes := [](mp.Metrics){}
+	metricsDiskUsedInBytes := [](mp.Metrics){}
 
 	for nodeName, _ := range p.Stats {
 		metricsOsLoadAverage = append(metricsOsLoadAverage,
@@ -107,6 +123,8 @@ func (p ElasticsearchNodesPlugin) GraphDefinition() map[string](mp.Graphs) {
 			mp.Metrics{Name: nodeName + "_process_cpu_percent", Label: nodeName, Diff: false, Type: "uint64"})
 		metricsJvmMemHeapUsedInBytes = append(metricsJvmMemHeapUsedInBytes,
 			mp.Metrics{Name: nodeName + "_jvm_mem_heap_used_in_bytes", Label: nodeName, Diff: false, Type: "uint64"})
+		metricsDiskUsedInBytes = append(metricsDiskUsedInBytes,
+			mp.Metrics{Name: nodeName + "_disk_used_in_bytes", Label: nodeName, Diff: false, Type: "uint64"})
 	}
 
 	graphdef["elasticsearch-nodes.OSLoadAverage"] = mp.Graphs{
@@ -125,6 +143,12 @@ func (p ElasticsearchNodesPlugin) GraphDefinition() map[string](mp.Graphs) {
 		Label:   "Elasticsearch nodes JVM Heap Mem Used",
 		Unit:    "bytes",
 		Metrics: metricsJvmMemHeapUsedInBytes,
+	}
+
+	graphdef["elasticsearch-nodes.DiskUsedInBytes"] = mp.Graphs{
+		Label:   "Elasticsearch nodes Disk Used",
+		Unit:    "bytes",
+		Metrics: metricsDiskUsedInBytes,
 	}
 
 	return graphdef
